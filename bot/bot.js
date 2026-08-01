@@ -28,6 +28,11 @@ function clearTimers() {
 }
 
 function connect() {
+  if (bot && status !== 'offline') {
+    log('Already connecting/online - skipping duplicate connect')
+    return
+  }
+
   const settings = loadSettings()
   manualDisconnect = false
   status = 'connecting'
@@ -52,16 +57,22 @@ function connect() {
 
     const m = settings.movement
 
-    // Simple random wander - no pathfinding, just walk forward and turn randomly
+    // Simple random wander - no pathfinding.
+    // Stops moving before turning, and turns without the "force" snap so the
+    // server's anti-cheat doesn't see it as an invalid/teleport-like movement.
     timers.push(setInterval(() => {
       if (!bot.entity) return
-      const newYaw = bot.entity.yaw + (Math.random() * 2 - 1) * (Math.PI / 2)
-      bot.look(newYaw, 0, true)
-      bot.setControlState('forward', true)
-      currentActivity = 'wandering'
+      bot.setControlState('forward', false)
+      const targetYaw = bot.entity.yaw + (Math.random() * 2 - 1) * (Math.PI / 3)
+      bot.look(targetYaw, 0, false)
       setTimeout(() => {
-        if (bot) bot.setControlState('forward', false)
-      }, m.walkDurationMs)
+        if (!bot || !bot.entity) return
+        bot.setControlState('forward', true)
+        currentActivity = 'wandering'
+        setTimeout(() => {
+          if (bot) bot.setControlState('forward', false)
+        }, m.walkDurationMs)
+      }, 300)
     }, m.wanderIntervalMs))
 
     // Occasional sprint
@@ -109,6 +120,7 @@ function connect() {
     clearTimers()
     status = 'offline'
     currentActivity = 'idle'
+    bot = null
     if (!manualDisconnect) {
       log(`Disconnected - reconnecting in ${reconnectDelay / 1000}s`)
       setTimeout(connect, reconnectDelay)
@@ -152,9 +164,11 @@ function disconnect() {
       log('Error while disconnecting: ' + e.message)
     }
   }
+  bot = null
   status = 'offline'
   currentActivity = 'idle'
 }
+
 function reconnect() {
   disconnect()
   setTimeout(connect, 1000)
