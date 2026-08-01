@@ -141,11 +141,20 @@ function placeRandomBlock() {
 function disconnect() {
   manualDisconnect = true
   clearTimers()
-  if (bot) bot.quit()
+  if (bot) {
+    try {
+      if (typeof bot.quit === 'function') {
+        bot.quit()
+      } else if (bot._client && typeof bot._client.end === 'function') {
+        bot._client.end()
+      }
+    } catch (e) {
+      log('Error while disconnecting: ' + e.message)
+    }
+  }
   status = 'offline'
   currentActivity = 'idle'
 }
-
 function reconnect() {
   disconnect()
   setTimeout(connect, 1000)
